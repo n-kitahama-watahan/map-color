@@ -1,93 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>世界地図カラーリング</title>
-  <link rel="stylesheet" href="styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>世界地図 色塗りアプリ</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: inline-block;
+        }
+        button, input[type="color"] {
+            cursor: pointer;
+            padding: 8px 15px;
+            margin: 0 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #e9e9e9;
+        }
+        .map-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        /* SVG内の国（path）にホバーした時のエフェクト */
+        svg path {
+            cursor: pointer;
+            transition: opacity 0.2s;
+            stroke: #ffffff; /* 国境線の色 */
+            stroke-width: 1px;
+        }
+        svg path:hover {
+            opacity: 0.7;
+        }
+    </style>
 </head>
 <body>
-  <header class="app-header">
-    <div>
-      <p class="eyebrow">World Map Coloring</p>
-      <h1>世界地図カラーリング</h1>
+
+    <h1>世界地図 色塗りアプリ</h1>
+    
+    <div class="controls">
+        <label for="colorPicker">色を選ぶ: </label>
+        <input type="color" id="colorPicker" value="#ff5722">
+        <button onclick="downloadSVG()">SVGで保存</button>
+        <button onclick="downloadPNG()">PNGで保存</button>
     </div>
-    <div class="header-actions">
-      <button id="downloadSvgBtn" class="primary">SVG保存</button>
-      <button id="downloadPngBtn" class="primary">PNG保存</button>
-    </div>
-  </header>
 
-  <main class="layout">
-    <aside class="panel" aria-label="操作パネル">
-      <section class="tool-section">
-        <h2>色を選ぶ</h2>
-        <label class="color-row">
-          <span>現在の色</span>
-          <input id="colorPicker" type="color" value="#5b8def" />
-        </label>
-        <div id="palette" class="palette" aria-label="カラーパレット"></div>
-        <div class="tool-grid">
-          <button id="paintModeBtn" class="active" type="button">塗る</button>
-          <button id="eraseModeBtn" type="button">消す</button>
-          <button id="pickModeBtn" type="button">色を拾う</button>
-          <button id="resetViewBtn" type="button">表示リセット</button>
-        </div>
-      </section>
-
-      <section class="tool-section">
-        <h2>国を探す</h2>
-        <input id="countrySearch" type="search" placeholder="例: Japan / France" autocomplete="off" />
-        <div id="countryInfo" class="country-info">国をクリックするとここに表示されます。</div>
-      </section>
-
-      <section class="tool-section">
-        <h2>保存・読み込み</h2>
-        <div class="tool-grid one-line">
-          <button id="saveStateBtn" type="button">配色を保存</button>
-          <button id="loadStateBtn" type="button">配色を復元</button>
-          <button id="exportJsonBtn" type="button">JSON書き出し</button>
-          <label class="file-button">
-            JSON読み込み
-            <input id="importJsonInput" type="file" accept="application/json,.json" />
-          </label>
-        </div>
-        <button id="clearBtn" class="danger" type="button">すべての色をクリア</button>
-      </section>
-
-      <section class="tool-section help">
-        <h2>使い方</h2>
-        <p>国をクリックして色を塗ります。マウスホイールで拡大、ドラッグで移動できます。</p>
-        <p>検索欄に国名を入れると該当国を強調表示します。</p>
-      </section>
-    </aside>
-
-    <section class="map-card">
-      <div class="map-toolbar">
-        <span id="statusText">地図データを読み込み中...</span>
-        <span id="modeText">モード: 塗る</span>
-      </div>
-      <div class="map-wrap">
-        <svg id="worldMap" viewBox="0 0 1200 680" role="img" aria-label="色を塗れる世界地図">
-          <defs>
-            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="5" stdDeviation="7" flood-opacity="0.12" />
-            </filter>
-          </defs>
-          <rect class="ocean" width="1200" height="680" rx="28" />
-          <g id="mapLayer"></g>
+    <div class="map-container">
+        <svg id="world-map" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="100%" height="100%">
+            <rect width="800" height="400" fill="#e0f7fa"/>
+            <path id="country1" d="M100,100 Q150,50 200,100 T300,150 L250,250 L100,200 Z" fill="#cccccc" />
+            <path id="country2" d="M350,150 Q400,100 500,150 T600,250 L450,300 Z" fill="#cccccc" />
+            <path id="country3" d="M200,250 Q250,350 350,300 T450,350 L300,380 Z" fill="#cccccc" />
+            <text x="170" y="150" fill="black" pointer-events="none">国A</text>
+            <text x="450" y="220" fill="black" pointer-events="none">国B</text>
+            <text x="320" y="320" fill="black" pointer-events="none">国C</text>
         </svg>
-      </div>
-    </section>
-  </main>
+    </div>
 
-  <template id="toastTemplate">
-    <div class="toast"></div>
-  </template>
-  <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+    <script>
+        const colorPicker = document.getElementById('colorPicker');
+        const svgMap = document.getElementById('world-map');
+        const paths = svgMap.querySelectorAll('path');
 
-  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-  <script src="app.js"></script>
+        // 各国（path）にクリックイベントを追加
+        paths.forEach(path => {
+            path.addEventListener('click', function() {
+                // 選択されている色で塗りつぶす
+                this.setAttribute('fill', colorPicker.value);
+            });
+        });
+
+        // --- SVG保存機能 ---
+        function downloadSVG() {
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgMap);
+            const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            
+            triggerDownload(url, 'colored_map.svg');
+        }
+
+        // --- PNG保存機能 ---
+        function downloadPNG() {
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgMap);
+            // SVGに幅と高さを明示的に設定しないとCanvas描画時にバグる場合があるため対策
+            const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(svgBlob);
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+
+            img.onload = function() {
+                // CanvasのサイズをSVGの元のサイズに合わせる
+                canvas.width = 800; // SVGのviewBoxに合わせる
+                canvas.height = 400;
+                
+                // SVG画像をCanvasに描画
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url); // メモリ解放
+
+                // CanvasをPNGのデータURLに変換
+                const pngUrl = canvas.toDataURL("image/png");
+                triggerDownload(pngUrl, 'colored_map.png');
+            };
+            img.src = url;
+        }
+
+        // ダウンロードを実行するヘルパー関数
+        function triggerDownload(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
 </body>
 </html>
