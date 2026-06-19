@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世界地図 色塗りアプリ</title>
+    <title>世界地図 色塗りアプリ (ズーム機能付き)</title>
     <style>
         body {
             font-family: sans-serif;
@@ -22,7 +22,7 @@
         button, input[type="color"] {
             cursor: pointer;
             padding: 8px 15px;
-            margin: 0 5px;
+            margin: 0 3px;
             border: 1px solid #ccc;
             border-radius: 4px;
             background: #fff;
@@ -31,22 +31,37 @@
         button:hover {
             background: #e9e9e9;
         }
+        .separator {
+            display: inline-block;
+            width: 1px;
+            height: 20px;
+            background-color: #ccc;
+            vertical-align: middle;
+            margin: 0 10px;
+        }
+        /* マップ表示エリアのスタイル調整 */
         .map-container {
-            max-width: 800px;
+            max-width: 1000px;
+            height: 600px; /* 高さを固定してスクロール可能にする */
             margin: 0 auto;
             background: white;
             border: 1px solid #ddd;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            overflow: auto; /* ズーム時にはみ出た部分をスクロールさせる */
+            position: relative;
         }
-        /* SVG内の国（path）にホバーした時のエフェクト */
-        svg path {
+        .map-container svg {
+            display: block;
+            transition: width 0.2s ease-out, height 0.2s ease-out; /* ズームを滑らかにする */
+        }
+        .map-container svg path {
             cursor: pointer;
             transition: opacity 0.2s;
-            stroke: #ffffff; /* 国境線の色 */
-            stroke-width: 1px;
+            stroke: #ffffff;
+            stroke-width: 0.5px;
         }
-        svg path:hover {
-            opacity: 0.7;
+        .map-container svg path:hover {
+            opacity: 0.6;
         }
     </style>
 </head>
@@ -55,52 +70,110 @@
     <h1>世界地図 色塗りアプリ</h1>
     
     <div class="controls">
-        <label for="colorPicker">色を選ぶ: </label>
+        <label for="colorPicker">色: </label>
         <input type="color" id="colorPicker" value="#ff5722">
-        <button onclick="downloadSVG()">SVGで保存</button>
-        <button onclick="downloadPNG()">PNGで保存</button>
+        
+        <div class="separator"></div>
+        
+        <button onclick="zoomIn()">拡大 ＋</button>
+        <button onclick="zoomOut()">縮小 －</button>
+        <button onclick="resetZoom()">リセット</button>
+        
+        <div class="separator"></div>
+
+        <button onclick="downloadSVG()">SVG保存</button>
+        <button onclick="downloadPNG()">PNG保存</button>
     </div>
 
-    <div class="map-container">
-        <svg id="world-map" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="100%" height="100%">
-            <rect width="800" height="400" fill="#e0f7fa"/>
-            <path id="country1" d="M100,100 Q150,50 200,100 T300,150 L250,250 L100,200 Z" fill="#cccccc" />
-            <path id="country2" d="M350,150 Q400,100 500,150 T600,250 L450,300 Z" fill="#cccccc" />
-            <path id="country3" d="M200,250 Q250,350 350,300 T450,350 L300,380 Z" fill="#cccccc" />
-            <text x="170" y="150" fill="black" pointer-events="none">国A</text>
-            <text x="450" y="220" fill="black" pointer-events="none">国B</text>
-            <text x="320" y="320" fill="black" pointer-events="none">国C</text>
-        </svg>
+    <div class="map-container" id="mapContainer">
+        <p style="padding: 20px;">地図を読み込んでいます...</p>
     </div>
 
     <script>
         const colorPicker = document.getElementById('colorPicker');
-        const svgMap = document.getElementById('world-map');
-        const paths = svgMap.querySelectorAll('path');
+        const mapContainer = document.getElementById('mapContainer');
+        let svgMap = null;
+        
+        // ズーム倍率を管理する変数
+        let currentZoom = 1;
+        const zoomStep = 0.3; // 1回クリックごとの拡大・縮小幅
 
-        // 各国（path）にクリックイベントを追加
-        paths.forEach(path => {
-            path.addEventListener('click', function() {
-                // 選択されている色で塗りつぶす
-                this.setAttribute('fill', colorPicker.value);
-            });
+        window.addEventListener('DOMContentLoaded', () => {
+            fetch('map.svg')
+                .then(response => {
+                    if (!response.ok) throw new Error('map.svg が見つかりません。');
+                    return response.text();
+                })
+                .then(svgText => {
+                    mapContainer.innerHTML = svgText;
+                    svgMap = mapContainer.querySelector('svg');
+                    
+                    if (!svgMap) return mapContainer.innerHTML = '<p>SVG要素がありません。</p>';
+
+                    // 初期サイズの設定
+                    svgMap.style.width = '100%';
+                    svgMap.style.height = '100%';
+
+                    setupColoring();
+                })
+                .catch(error => {
+                    mapContainer.innerHTML = `<p style="color:red;">エラー: ${error.message}</p>`;
+                });
         });
 
-        // --- SVG保存機能 ---
+        function setupColoring() {
+            const paths = svgMap.querySelectorAll('path');
+            paths.forEach(path => {
+                path.addEventListener('click', function() {
+                    this.setAttribute('fill', colorPicker.value);
+                });
+            });
+        }
+
+        // --- ズーム機能 ---
+        function zoomIn() {
+            if (!svgMap) return;
+            currentZoom += zoomStep;
+            applyZoom();
+        }
+
+        function zoomOut() {
+            if (!svgMap) return;
+            // 縮小しすぎて消えないように下限を設定
+            if (currentZoom > 0.4) { 
+                currentZoom -= zoomStep;
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            if (!svgMap) return;
+            currentZoom = 1;
+            applyZoom();
+            // スクロール位置を一番左上に戻す
+            mapContainer.scrollTop = 0;
+            mapContainer.scrollLeft = 0;
+        }
+
+        function applyZoom() {
+            // CSSのwidth/heightをパーセントで変更して拡大縮小する
+            svgMap.style.width = `${currentZoom * 100}%`;
+            svgMap.style.height = `${currentZoom * 100}%`;
+        }
+
+        // --- 保存機能 ---
         function downloadSVG() {
+            if (!svgMap) return alert('地図が読み込まれていません。');
             const serializer = new XMLSerializer();
             const svgString = serializer.serializeToString(svgMap);
             const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-            const url = URL.createObjectURL(blob);
-            
-            triggerDownload(url, 'colored_map.svg');
+            triggerDownload(URL.createObjectURL(blob), 'colored_map.svg');
         }
 
-        // --- PNG保存機能 ---
         function downloadPNG() {
+            if (!svgMap) return alert('地図が読み込まれていません。');
             const serializer = new XMLSerializer();
             const svgString = serializer.serializeToString(svgMap);
-            // SVGに幅と高さを明示的に設定しないとCanvas描画時にバグる場合があるため対策
             const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
 
@@ -109,22 +182,24 @@
             const img = new Image();
 
             img.onload = function() {
-                // CanvasのサイズをSVGの元のサイズに合わせる
-                canvas.width = 800; // SVGのviewBoxに合わせる
-                canvas.height = 400;
+                // viewBoxから本来のSVGサイズを取得してCanvasのサイズを決定
+                // ズーム（CSSサイズ）に関わらず、常に高画質で本来のサイズで書き出します
+                const viewBox = svgMap.viewBox.baseVal;
+                canvas.width = viewBox.width || 1200; 
+                canvas.height = viewBox.height || 600;
                 
-                // SVG画像をCanvasに描画
+                // SVGに背景色が指定されていない場合、PNGが透過になってしまうため白背景を敷く
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
                 ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(url); // メモリ解放
+                URL.revokeObjectURL(url);
 
-                // CanvasをPNGのデータURLに変換
-                const pngUrl = canvas.toDataURL("image/png");
-                triggerDownload(pngUrl, 'colored_map.png');
+                triggerDownload(canvas.toDataURL("image/png"), 'colored_map.png');
             };
             img.src = url;
         }
 
-        // ダウンロードを実行するヘルパー関数
         function triggerDownload(url, filename) {
             const link = document.createElement('a');
             link.href = url;
